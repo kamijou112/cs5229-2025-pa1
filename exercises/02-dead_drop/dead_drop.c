@@ -193,10 +193,7 @@ void dead_drop_main_loop(void)
                 if (eth_hdr->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
                 {
                     rte_pktmbuf_free(mbuf);
-<<<<<<< HEAD
                     continue;
-=======
->>>>>>> remove return statement in main loop
                 }
 
                 struct rte_ipv4_hdr *ipv4_hdr = (struct rte_ipv4_hdr *)(eth_hdr + 1);
