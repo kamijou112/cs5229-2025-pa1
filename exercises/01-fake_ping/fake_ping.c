@@ -29,6 +29,49 @@ bool process_packet(struct rte_mbuf *buf)
     RTE_LOG(INFO, USER1, "Ethernet header type is IPv4\n");
 
     // TODO: YOUR CODE HERE
+    struct rte_ipv4_hdr *ip_hdr = rte_pktmbuf_mtod_offset(buf, struct rte_ipv4_hdr *, sizeof(struct rte_ether_hdr));
+
+    if (ip_hdr->next_proto_id != IPPROTO_ICMP)
+    {
+        RTE_LOG(INFO, USER1, "Next protocol ID is not ICMP,dropping\n");
+        return false;
+    }
+
+    uint32_t dst_ip = rte_be_to_cpu_32(ip_hdr->dst_addr);
+    if (dst_ip & 0xFF000000 != 0x0A000000) {
+        RTE_LOG(INFO, USER1, "Destination IP is not in 10.0.0.0/8 subnet,dropping\n");
+        return false;
+    }
+
+    struct rte_icmp_hdr *icmp_hdr = rte_pktmbuf_mtod_offset(buf, struct rte_icmp_hdr *, sizeof(struct rte_ipv4_hdr));
+    if (icmp_hdr->icmp_type != ICMP_ECHO_REQUEST || icmp_hdr->icmp_code != 0)
+    {
+        RTE_LOG(INFO, USER1, "ICMP header type is not Echo Request or code is not 0,dropping\n");
+        return false;
+    }
+    RTE_LOG(INFO, USER1, "valid ICMP Echo Request received,sending reply\n");
+
+    icmp_hdr->icmp_type = ICMP_ECHO_REPLY;
+    icmp_hdr->icmp_code = 0;
+    icmp_hdr->icmp_cksum = 0;
+    icmp_hdr->icmp_cksum = rte_ipv4_cksum(ip_hdr, sizeof(struct rte_ipv4_hdr));
+
+    //exchange source and destination IP addresses
+    uint32_t temp_ip = ip_hdr->src_addr;
+    ip_hdr->src_addr = ip_hdr->dst_addr;
+    ip_hdr->dst_addr = temp_ip;
+
+    //exchange source and destination MAC addresses
+    struct rte_ether_addr temp_mac;
+    rte_ether_addr_copy(&eth_hdr->src_addr, &temp_mac);
+    rte_ether_addr_copy(&eth_hdr->dst_addr, &eth_hdr->src_addr);
+    rte_ether_addr_copy(&temp_mac, &eth_hdr->dst_addr);
+
+    ip_hdr->cksum = 0;
+    ip_hdr->cksum = rte_ipv4_cksum(ip_hdr);
+
+    icmp_hdr->icmp_cksum = rte_ipv4_udptcp_cksum(ip_hdr, icmp_hdr);
+    
 
     return true;
 }
