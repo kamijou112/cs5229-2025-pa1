@@ -105,6 +105,8 @@ static void construct_reply(
     udp_hdr->src_port = udp_hdr->dst_port;
     udp_hdr->dst_port = temp_port;
 
+    ipv4_hdr->time_to_live = 64;
+
     // Set new secret header values 
     secret_hdr_ptr->opCode = rte_cpu_to_be_16(op_code);
     secret_hdr_ptr->message = rte_cpu_to_be_32(message_val);
@@ -191,19 +193,12 @@ void dead_drop_main_loop(void)
                 if (eth_hdr->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
                 {
                     rte_pktmbuf_free(mbuf);
-                    return;
+                    continue;
                 }
 
                 struct rte_ipv4_hdr *ipv4_hdr = (struct rte_ipv4_hdr *)(eth_hdr + 1);
 
-                if (rte_be_to_cpu_32(ipv4_hdr->dst_addr) != RTE_IPV4(10, 0, 0, 254))
-                {
-                    RTE_LOG(INFO, USER1, "Destination IP is not 10.0.0.254, dropping packet\\n");
-                    rte_pktmbuf_free(mbuf);
-                    continue;
-                }
-
-                if (ipv4_hdr->next_proto_id == IPPROTO_UDP)
+                if (ipv4_hdr->next_proto_id == IPPROTO_UDP && rte_be_to_cpu_32(ipv4_hdr->dst_addr) == RTE_IPV4(10, 0, 0, 254))
                 {
                     struct rte_udp_hdr *udp_hdr = (struct rte_udp_hdr *)(ipv4_hdr + 1);
 
@@ -215,14 +210,16 @@ void dead_drop_main_loop(void)
                         uint16_t opCode = rte_be_to_cpu_16(secret_payload->opCode);
                         uint16_t mailboxNum = rte_be_to_cpu_16(secret_payload->mailboxNum);
                         uint32_t message_in = rte_be_to_cpu_32(secret_payload->message);
-
-                        if (opCode == DROPOFF) 
-                        {
+                        
+                        if (mailboxNum >= DEAD_DROP_BOX_SIZE) {
+                            RTE_LOG(ERR, USER1, "Invalid mailboxNum: %u (max %u), dropping\\n", mailboxNum, DEAD_DROP_BOX_SIZE - 1);
+                            construct_reply(mbuf, eth_hdr, ipv4_hdr, udp_hdr, secret_payload, FAILURE, 0);
+                        } else if (opCode == DROPOFF) {
                             if (dead_drop_box[mailboxNum] == 0xdeadbeef) { 
                                 dead_drop_box[mailboxNum] = message_in;
                                 dead_drop_box_checksum[mailboxNum] = rte_hash_crc(&message_in, sizeof(message_in), 0);
                                 RTE_LOG(INFO, USER1, "DROPOFF SUCCESS for mailbox %u, message=0x%x, checksum=0x%x\\n", mailboxNum, message_in, dead_drop_box_checksum[mailboxNum]);
-                                construct_reply(mbuf, eth_hdr, ipv4_hdr, udp_hdr, secret_payload, SUCCESS, 0);
+                                construct_reply(mbuf, eth_hdr, ipv4_hdr, udp_hdr, secret_payload, SUCCESS, message_in);
                             } else { // Mailbox already occupied
                                 RTE_LOG(INFO, USER1, "DROPOFF FAILURE for mailbox %u: already occupied\\n", mailboxNum);
                                 construct_reply(mbuf, eth_hdr, ipv4_hdr, udp_hdr, secret_payload, FAILURE, 0);
@@ -248,19 +245,14 @@ void dead_drop_main_loop(void)
                             }
                         } else {
                             RTE_LOG(INFO, USER1, "Invalid operation code: %u\\n", opCode);
-                            rte_pktmbuf_free(mbuf);
-                            continue;
+                            construct_reply(mbuf, eth_hdr, ipv4_hdr, udp_hdr, secret_payload, FAILURE, 0);
                         } 
-                    } else {
-                        RTE_LOG(INFO, USER1, "UDP port %u is not the secret port, dropping packet\\n", rte_be_to_cpu_16(udp_hdr->dst_port));
-                        rte_pktmbuf_free(mbuf);
+
+                        if (rte_eth_tx_burst(port_id, 0, &mbuf, 1) < 1) {
+                            rte_pktmbuf_free(mbuf);
+                        }
                         continue;
                     }
-                    
-                }else {
-                    RTE_LOG(INFO, USER1, "Next protocol ID is not UDP, dropping packet\\n");
-                    rte_pktmbuf_free(mbuf);
-                    continue;
                 }
 
                 uint16_t *destination_port = NULL;
