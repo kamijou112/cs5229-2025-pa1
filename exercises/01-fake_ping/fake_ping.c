@@ -66,6 +66,8 @@ bool process_packet(struct rte_mbuf *buf)
     rte_ether_addr_copy(&eth_hdr->src_addr, &temp_mac);
     rte_ether_addr_copy(&eth_hdr->dst_addr, &eth_hdr->src_addr);
     rte_ether_addr_copy(&temp_mac, &eth_hdr->dst_addr);
+    
+    ip_hdr->time_to_live = 64;
 
     ip_hdr->hdr_checksum = 0;
     ip_hdr->hdr_checksum = rte_ipv4_cksum(ip_hdr);

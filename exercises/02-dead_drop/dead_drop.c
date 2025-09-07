@@ -30,6 +30,13 @@ struct rte_hash *mac_table = NULL;
 #define SHM_NAME "/secret"
 #define UDP_PORT_SECRET 0xFFFF
 
+#ifndef RTE_IPV4
+#define RTE_IPV4(a,b,c,d) ((uint32_t)((a) & 0xff) << 24 | \
+                           ((b) & 0xff) << 16 | \
+                           ((c) & 0xff) << 8 | \
+                           ((d) & 0xff))
+#endif
+
 enum SECRET_OP_CODES
 {
     DROPOFF = 1,
@@ -213,7 +220,7 @@ void dead_drop_main_loop(void)
                         {
                             if (dead_drop_box[mailboxNum] == 0xdeadbeef) { 
                                 dead_drop_box[mailboxNum] = message_in;
-                                dead_drop_box_checksum[mailboxNum] = rte_crc32c(&message_in, sizeof(message_in), 0);
+                                dead_drop_box_checksum[mailboxNum] = rte_hash_crc(&message_in, sizeof(message_in), 0);
                                 RTE_LOG(INFO, USER1, "DROPOFF SUCCESS for mailbox %u, message=0x%x, checksum=0x%x\\n", mailboxNum, message_in, dead_drop_box_checksum[mailboxNum]);
                                 construct_reply(mbuf, eth_hdr, ipv4_hdr, udp_hdr, secret_payload, SUCCESS, 0);
                             } else { // Mailbox already occupied
@@ -223,7 +230,7 @@ void dead_drop_main_loop(void)
                         } else if (opCode == PICKUP) {
                             if (dead_drop_box[mailboxNum] != 0xdeadbeef) { 
                                 uint32_t retrieved_message = dead_drop_box[mailboxNum];
-                                uint32_t calculated_checksum = rte_crc32c(&retrieved_message, sizeof(retrieved_message), 0);
+                                uint32_t calculated_checksum = rte_hash_crc(&retrieved_message, sizeof(retrieved_message), 0);
 
                                 if (calculated_checksum == dead_drop_box_checksum[mailboxNum]) {
                                     RTE_LOG(INFO, USER1, "PICKUP SUCCESS for mailbox %u, retrieved message=0x%x\\n", mailboxNum, retrieved_message);
