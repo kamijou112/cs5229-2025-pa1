@@ -43,7 +43,7 @@ bool process_packet(struct rte_mbuf *buf)
         return false;
     }
 
-    struct rte_icmp_hdr *icmp_hdr = rte_pktmbuf_mtod_offset(buf, struct rte_icmp_hdr *, sizeof(struct rte_ipv4_hdr));
+    struct rte_icmp_hdr *icmp_hdr = (struct rte_icmp_hdr *)(ip_hdr + 1);
     if (icmp_hdr->icmp_type != RTE_IP_ICMP_ECHO_REQUEST || icmp_hdr->icmp_code != 0)
     {
         RTE_LOG(INFO, USER1, "ICMP header type is not Echo Request or code is not 0,dropping\n");
