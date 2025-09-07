@@ -38,7 +38,7 @@ bool process_packet(struct rte_mbuf *buf)
     }
 
     uint32_t dst_ip = rte_be_to_cpu_32(ip_hdr->dst_addr);
-    if (dst_ip & 0xFF000000 != 0x0A000000) {
+    if ((dst_ip & 0xFF000000) != 0x0A000000) {
         RTE_LOG(INFO, USER1, "Destination IP is not in 10.0.0.0/8 subnet,dropping\n");
         return false;
     }
