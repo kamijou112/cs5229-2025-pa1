@@ -44,17 +44,17 @@ bool process_packet(struct rte_mbuf *buf)
     }
 
     struct rte_icmp_hdr *icmp_hdr = rte_pktmbuf_mtod_offset(buf, struct rte_icmp_hdr *, sizeof(struct rte_ipv4_hdr));
-    if (icmp_hdr->icmp_type != ICMP_ECHO_REQUEST || icmp_hdr->icmp_code != 0)
+    if (icmp_hdr->icmp_type != RTE_IP_ICMP_ECHO_REQUEST || icmp_hdr->icmp_code != 0)
     {
         RTE_LOG(INFO, USER1, "ICMP header type is not Echo Request or code is not 0,dropping\n");
         return false;
     }
-    RTE_LOG(INFO, USER1, "valid ICMP Echo Request received,sending reply\n");
+    RTE_LOG(INFO, USER1, "valid ICMP Echo Request received,generating reply\n");
 
-    icmp_hdr->icmp_type = ICMP_ECHO_REPLY;
+    icmp_hdr->icmp_type = RTE_IP_ICMP_ECHO_REPLY;
     icmp_hdr->icmp_code = 0;
     icmp_hdr->icmp_cksum = 0;
-    icmp_hdr->icmp_cksum = rte_ipv4_cksum(ip_hdr, sizeof(struct rte_ipv4_hdr));
+    icmp_hdr->icmp_cksum = rte_ipv4_udptcp_cksum(ip_hdr, icmp_hdr);
 
     //exchange source and destination IP addresses
     uint32_t temp_ip = ip_hdr->src_addr;
@@ -69,10 +69,7 @@ bool process_packet(struct rte_mbuf *buf)
 
     ip_hdr->cksum = 0;
     ip_hdr->cksum = rte_ipv4_cksum(ip_hdr);
-
-    icmp_hdr->icmp_cksum = rte_ipv4_udptcp_cksum(ip_hdr, icmp_hdr);
     
-
     return true;
 }
 
