@@ -132,7 +132,7 @@ void learning_switch_main_loop(void)
                                 eth_hdr->dst_addr.addr_bytes[0], eth_hdr->dst_addr.addr_bytes[1],
                                 eth_hdr->dst_addr.addr_bytes[2], eth_hdr->dst_addr.addr_bytes[3],
                                 eth_hdr->dst_addr.addr_bytes[4], eth_hdr->dst_addr.addr_bytes[5], port_id);
-                            rte_pktmbuf_free(m); // Drop if destination is same as ingress (no need to send back)
+                            rte_pktmbuf_free(m); // Drop if destination is same as ingress 
                         } else {
                             RTE_LOG(INFO, USER1, "Forwarding packet from port %u to port %u (Dest MAC: %02x:%02x:%02x:%02x:%02x:%02x).\n",
                                     port_id, *out_port,
@@ -141,10 +141,8 @@ void learning_switch_main_loop(void)
                                     eth_hdr->dst_addr.addr_bytes[4], eth_hdr->dst_addr.addr_bytes[5]);
                             if (rte_eth_tx_burst(*out_port, 0, &m, 1) < 1) {
                                 RTE_LOG(ERR, USER1, "Failed to send packet to port %u.\\n", *out_port);
-                                rte_pktmbuf_free(m); // Free if transmission failed
-                            } else {
-                                // Packet successfully sent, DPDK frees mbuf.
-                            }
+                                rte_pktmbuf_free(m); 
+                            } 
                         }
                     }
                 }
