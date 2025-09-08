@@ -72,13 +72,13 @@ void learning_switch_main_loop(void)
                 if (ret < 0) { // MAC not found, add it
                     uint16_t *out_port = malloc(sizeof(uint16_t));
                     if (out_port == NULL) {
-                        RTE_LOG(ERR, USER1, "Failed to allocate memory for port data, dropping packet.\\n");
+                        RTE_LOG(ERR, USER1, "Failed to allocate memory for port data, dropping packet.\n");
                         rte_pktmbuf_free(m);
                         continue;
                     }
                     *out_port = port_id; // Store the ingress port
                     rte_hash_add_key_data(mac_table, &eth_hdr->src_addr, (void *)out_port);
-                    RTE_LOG(INFO, USER1, "Learned MAC: %02x:%02x:%02x:%02x:%02x:%02x on port %u\\n",
+                    RTE_LOG(INFO, USER1, "Learned MAC: %02x:%02x:%02x:%02x:%02x:%02x on port %u\n",
                             eth_hdr->src_addr.addr_bytes[0], eth_hdr->src_addr.addr_bytes[1],
                             eth_hdr->src_addr.addr_bytes[2], eth_hdr->src_addr.addr_bytes[3],
                             eth_hdr->src_addr.addr_bytes[4], eth_hdr->src_addr.addr_bytes[5], port_id);
@@ -87,7 +87,7 @@ void learning_switch_main_loop(void)
                     uint16_t *existing_port = NULL;
                     rte_hash_lookup_data(mac_table, &eth_hdr->src_addr, (void **)&existing_port);
                     if (existing_port != NULL && *existing_port != port_id) {
-                         RTE_LOG(INFO, USER1, "MAC %02x:%02x:%02x:%02x:%02x:%02x moved from port %u to %u\\n",
+                         RTE_LOG(INFO, USER1, "MAC %02x:%02x:%02x:%02x:%02x:%02x moved from port %u to %u\n",
                             eth_hdr->src_addr.addr_bytes[0], eth_hdr->src_addr.addr_bytes[1],
                             eth_hdr->src_addr.addr_bytes[2], eth_hdr->src_addr.addr_bytes[3],
                             eth_hdr->src_addr.addr_bytes[4], eth_hdr->src_addr.addr_bytes[5], *existing_port, port_id);
@@ -98,14 +98,14 @@ void learning_switch_main_loop(void)
                 // 2. Forwarding Decision based on Destination MAC
                 if (is_broadcast_mac(&eth_hdr->dst_addr)) {
                     // Flood broadcast packets to all ports except ingress
-                    RTE_LOG(INFO, USER1, "Broadcast packet received on port %u, flooding.\\n", port_id);
-                    for (uint16_t p = 0; p < num_eth_ports; p++) {
-                        if (p == port_id) continue; // Don't send back to ingress port
+                    RTE_LOG(INFO, USER1, "Broadcast packet received on port %u, flooding.\n", port_id);
+                    for (uint16_t p = 0; p < rte_eth_dev_count_avail(); p++) {
+                        if (p == port_id) continue; 
                         // Duplicate mbuf for each output port
                         struct rte_mbuf *m_copy = rte_pktmbuf_clone(m, m->pool);
                         if (m_copy == NULL) {
-                            RTE_LOG(ERR, USER1, "Failed to clone mbuf for flooding, dropping broadcast packet to port %u.\\n", p);
-                            continue; // Try next port
+                            RTE_LOG(ERR, USER1, "Failed to clone mbuf for flooding, dropping broadcast packet to port %u.\n", p);
+                            continue; 
                         }
                         if (rte_eth_tx_burst(p, 0, &m_copy, 1) < 1) {
                             RTE_LOG(ERR, USER1, "Failed to send broadcast packet on port %u.\\n", p);
@@ -120,21 +120,21 @@ void learning_switch_main_loop(void)
 
                     if (ret < 0 || out_port == NULL) {
                         // Destination MAC unknown, drop packet
-                        RTE_LOG(INFO, USER1, "Unknown destination MAC: %02x:%02x:%02x:%02x:%02x:%02x, dropping packet.\\n",
+                        RTE_LOG(INFO, USER1, "Unknown destination MAC: %02x:%02x:%02x:%02x:%02x:%02x, dropping packet.\n",
                                 eth_hdr->dst_addr.addr_bytes[0], eth_hdr->dst_addr.addr_bytes[1],
                                 eth_hdr->dst_addr.addr_bytes[2], eth_hdr->dst_addr.addr_bytes[3],
                                 eth_hdr->dst_addr.addr_bytes[4], eth_hdr->dst_addr.addr_bytes[5]);
                         rte_pktmbuf_free(m);
                     } else {
-                        // Destination MAC known, forward to specific port
+                        // Destination MAC known
                         if (*out_port == port_id) {
-                            RTE_LOG(INFO, USER1, "Packet to known MAC %02x:%02x:%02x:%02x:%02x:%02x for same ingress port %u, dropping.\\n",
+                            RTE_LOG(INFO, USER1, "Packet to known MAC %02x:%02x:%02x:%02x:%02x:%02x for same ingress port %u, dropping.\n",
                                 eth_hdr->dst_addr.addr_bytes[0], eth_hdr->dst_addr.addr_bytes[1],
                                 eth_hdr->dst_addr.addr_bytes[2], eth_hdr->dst_addr.addr_bytes[3],
                                 eth_hdr->dst_addr.addr_bytes[4], eth_hdr->dst_addr.addr_bytes[5], port_id);
                             rte_pktmbuf_free(m); // Drop if destination is same as ingress (no need to send back)
                         } else {
-                            RTE_LOG(INFO, USER1, "Forwarding packet from port %u to port %u (Dest MAC: %02x:%02x:%02x:%02x:%02x:%02x).\\n",
+                            RTE_LOG(INFO, USER1, "Forwarding packet from port %u to port %u (Dest MAC: %02x:%02x:%02x:%02x:%02x:%02x).\n",
                                     port_id, *out_port,
                                     eth_hdr->dst_addr.addr_bytes[0], eth_hdr->dst_addr.addr_bytes[1],
                                     eth_hdr->dst_addr.addr_bytes[2], eth_hdr->dst_addr.addr_bytes[3],
