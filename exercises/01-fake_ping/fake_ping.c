@@ -43,7 +43,10 @@ bool process_packet(struct rte_mbuf *buf)
         return false;
     }
 
-    struct rte_icmp_hdr *icmp_hdr = (struct rte_icmp_hdr *)(ip_hdr + 1);
+    //struct rte_icmp_hdr *icmp_hdr = (struct rte_icmp_hdr *)(ip_hdr + 1);
+    // The ihl field stores the length in 32-bit words.
+    uint16_t ip_hdr_len = (ip_hdr->ihl & 0x0f) * 4;
+    struct rte_icmp_hdr *icmp_hdr = (struct rte_icmp_hdr *)((char *)ip_hdr + ip_hdr_len);
     if (icmp_hdr->icmp_type != RTE_IP_ICMP_ECHO_REQUEST || icmp_hdr->icmp_code != 0)
     {
         RTE_LOG(INFO, USER1, "ICMP header type is not Echo Request or code is not 0,dropping\n");
@@ -54,7 +57,9 @@ bool process_packet(struct rte_mbuf *buf)
     icmp_hdr->icmp_type = RTE_IP_ICMP_ECHO_REPLY;
     icmp_hdr->icmp_code = 0;
     icmp_hdr->icmp_cksum = 0;
-    icmp_hdr->icmp_cksum = rte_ipv4_udptcp_cksum(ip_hdr, icmp_hdr);
+    //icmp_hdr->icmp_cksum = rte_ipv4_udptcp_cksum(ip_hdr, icmp_hdr);
+    uint16_t icmp_len = rte_be_to_cpu_16(ip_hdr->total_length) - ip_hdr_len;
+    icmp_hdr->icmp_cksum = rte_raw_cksum(icmp_hdr, icmp_len);
 
     //exchange source and destination IP addresses
     uint32_t temp_ip = ip_hdr->src_addr;
@@ -94,8 +99,10 @@ void fake_ping_main_loop(void)
                     if (process_packet(m))
                     {
                         rte_eth_tx_burst(port_id, 0, &m, 1);
+                    } else {
+                        rte_pktmbuf_free(m);
                     }
-                    rte_pktmbuf_free(m);
+                    
                 }
             }
         }
